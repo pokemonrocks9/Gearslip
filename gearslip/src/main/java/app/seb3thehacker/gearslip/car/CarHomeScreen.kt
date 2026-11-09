@@ -110,7 +110,8 @@ fun CarHome() {
         val column = (maxWidth / PLAYER_SHARE).coerceIn(PLAYER_MIN_WIDTH, PLAYER_MAX_WIDTH)
         androidx.compose.runtime.CompositionLocalProvider(
             LocalCardsAtEnd provides (splitScreen && playerLeft),
-            LocalSidePanelInset provides if (splitScreen) column else 0.dp,
+            // The map's own cards keep a little room from the player's edge rather than touching it.
+            LocalSidePanelInset provides if (splitScreen) column + MAP_GAP else 0.dp,
         ) {
             MapPane(navStatus, frame)
         }
@@ -122,15 +123,12 @@ fun CarHome() {
             exit = androidx.compose.animation.slideOutHorizontally(tween(180)) { if (playerLeft) -it / 3 else it / 3 } +
                 androidx.compose.animation.fadeOut(tween(140)),
         ) {
+            // Flush to the screen's edge, the top and the nav bar: a pane of its own, not a card
+            // with the map showing round it.
             val card = Modifier
                 .width(column)
                 .fillMaxHeight()
-                .padding(
-                    start = if (playerLeft) CARD_GAP else 0.dp,
-                    end = if (playerLeft) 0.dp else CARD_GAP,
-                    top = CARD_GAP,
-                    bottom = LocalNavBarInset.current + CARD_GAP,
-                )
+                .padding(bottom = LocalNavBarInset.current)
             if (shown.value == SidePanel.LYRICS) SideLyrics(now, card) else DockedPlayer(now, card)
         }
     }
@@ -143,11 +141,11 @@ private const val PLAYER_SHARE = 3.6f
 private val PLAYER_MIN_WIDTH = 240.dp
 private val PLAYER_MAX_WIDTH = 340.dp
 
-/** Between the player card and the screen's edges, and the map's own cards beside it. */
-private val CARD_GAP = 12.dp
+/** Between the player's edge and the map app's own cards beside it. */
+private val MAP_GAP = 12.dp
 
-/** The card's corners: rounder than a button's, as the map app's own cards are. */
-private val CARD_SHAPE = RoundedCornerShape(24.dp)
+/** Square: the pane meets the screen's edges and the nav bar, so it reads as a split, not a card. */
+private val CARD_SHAPE = androidx.compose.ui.graphics.RectangleShape
 
 @Composable
 private fun MapPane(status: CarAppConnection.Status, frame: CarEnvironment.Frame) {
@@ -233,7 +231,7 @@ private fun DockedPlayer(now: NowPlaying, modifier: Modifier) {
 
     // The theme's surface, with a faint wash of the cover's colours behind the top of it. A solid
     // slab of album colour beside the map fought it for attention; this only hints at the song.
-    Surface(modifier = modifier.gsPanelShadow(CARD_SHAPE), shape = CARD_SHAPE, color = scheme.surfaceContainer) {
+    Surface(modifier = modifier, shape = CARD_SHAPE, color = scheme.surfaceContainer) {
         AlbumGlow(art, Modifier.fillMaxSize())
         Box(Modifier.fillMaxSize().padding(12.dp)) {
             Column(Modifier.fillMaxSize(), horizontalAlignment = Alignment.CenterHorizontally) {
@@ -299,7 +297,7 @@ private fun SideLyrics(now: NowPlaying, modifier: Modifier) {
     val context = LocalContext.current
     val scheme = MaterialTheme.colorScheme
     val art by produceState(now.art, now.art, now.artUri) { value = now.art ?: MediaArt.load(context, now.artUri) }
-    Surface(modifier = modifier.gsPanelShadow(CARD_SHAPE), shape = CARD_SHAPE, color = scheme.surfaceContainer) {
+    Surface(modifier = modifier, shape = CARD_SHAPE, color = scheme.surfaceContainer) {
         Column(Modifier.fillMaxSize().padding(start = 18.dp, end = 12.dp, top = 12.dp, bottom = 8.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Box(Modifier.size(36.dp).clip(RoundedCornerShape(8.dp)).background(scheme.surface)) {
