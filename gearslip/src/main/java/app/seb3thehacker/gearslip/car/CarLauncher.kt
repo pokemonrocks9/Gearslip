@@ -167,6 +167,8 @@ private fun tilesFor(
     messaging: app.seb3thehacker.gearslip.notify.MessagingApp?,
     browse: String,
 ): List<AppTile> {
+    // A player whose car screen is only its settings (YT Music via Morphe): the player is the app.
+    if (car?.kind == "settings" && media != null) return listOf(AppTile.Player(media))
     if (car != null && !car.isMediaScreen && car.kind != "messaging") return listOf(AppTile.Screen(car, car.label))
     val pkg = car?.component?.packageName ?: media?.component?.packageName ?: messaging?.packageName ?: return emptyList()
     return buildList {
@@ -204,6 +206,7 @@ private fun groupOf(entry: Entry, mediaPackages: Set<String>): AppGroup {
             BuiltInApps.Web -> AppGroup.WEB
             BuiltInApps.ScreenSharing -> AppGroup.SCREEN_SHARING
             BuiltInApps.Exit -> AppGroup.EXIT
+            BuiltInApps.NowPlaying -> AppGroup.MUSIC
             else -> AppGroup.SETTINGS
         }
     }

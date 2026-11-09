@@ -5,6 +5,7 @@ import android.content.Context
 import android.media.session.MediaController
 import android.media.session.MediaSessionManager
 import android.media.session.PlaybackState
+import app.seb3thehacker.gearslip.GearslipLog
 import app.seb3thehacker.gearslip.audio.CarAudio
 import app.seb3thehacker.gearslip.host.CarAppCatalog
 import app.seb3thehacker.gearslip.host.CarAppConnection
@@ -13,6 +14,7 @@ import app.seb3thehacker.gearslip.host.TemplateApp
 import app.seb3thehacker.gearslip.media.CarMedia
 import app.seb3thehacker.gearslip.media.MediaApp
 import app.seb3thehacker.gearslip.media.MediaCatalog
+import app.seb3thehacker.gearslip.media.SessionFollower
 import app.seb3thehacker.gearslip.notify.GearslipNotificationListener
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -217,6 +219,11 @@ object CarServices {
             if (app != null) connectNav(app, frame)
         }
 
+        if (follower == null) {
+            follower = SessionFollower(ctx, { _mediaApp.value?.component?.packageName }) { openMedia(it) }
+                .also { it.start() }
+        }
+
         if (_mediaApp.value == null) {
             val catalog = withContext(Dispatchers.IO) { MediaCatalog.installed(ctx) }
             // Something already playing on the phone wins over whatever was last used in the car -
@@ -251,6 +258,37 @@ object CarServices {
             .filter { it.playbackState?.state == PlaybackState.STATE_PLAYING }
             .map { it.packageName }
         return playingPackages.firstNotNullOfOrNull { pkg -> catalog.firstOrNull { it.component.packageName == pkg } }
+            // Nothing car-enabled is playing: take whatever is (YouTube, a browser, a podcast app)
+            // and drive its session, the way the phone's own media controls do.
+            ?: playingPackages.firstNotNullOfOrNull { pkg -> MediaCatalog.forPackage(ctx, pkg) }
+    }
+
+    /** Switches the player to whatever starts playing on the phone mid-drive. */
+    private var follower: SessionFollower? = null
+
+    /**
+     * The Now Playing tile: opens whatever the phone is playing, or the app played most recently
+     * when nothing is, like the notification shade's player. False when there's nothing to open.
+     */
+    fun openNowPlaying(): Boolean {
+        val ctx = context ?: return false
+        val manager = ctx.getSystemService(MediaSessionManager::class.java)
+        val sessions = try {
+            manager.getActiveSessions(ComponentName(ctx, GearslipNotificationListener::class.java))
+        } catch (e: SecurityException) {
+            GearslipLog.w("now playing: needs notification access to see other players")
+            return false
+        }
+        val candidates = sessions.filter { it.packageName != ctx.packageName && !KnownApps.isHidden(it.packageName) }
+        val pick = candidates.firstOrNull { it.playbackState?.state == PlaybackState.STATE_PLAYING } ?: candidates.firstOrNull()
+        val app = pick?.let { MediaCatalog.forPackage(ctx, it.packageName) }
+        if (app == null) {
+            GearslipLog.i("now playing: no app has a media session")
+            return false
+        }
+        GearslipLog.i("now playing: opening ${app.label}")
+        if (_mediaApp.value?.component != app.component) openMedia(app)
+        return true
     }
 
     /**
@@ -341,6 +379,8 @@ object CarServices {
         // About 900 MB that nothing needs once the car's gone.
         app.seb3thehacker.gearslip.speech.SpeechEngine.unload()
         CarAudio.release()
+        follower?.stop()
+        follower = null
         _mediaApp.value = null
         navStopped = false
     }

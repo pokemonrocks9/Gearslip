@@ -20,6 +20,7 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.List
+import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Call
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Search
@@ -87,10 +88,16 @@ internal object BuiltInApps {
     /** Launcher mode only: every app on the device, opened full screen. */
     val AllApps = BuiltInApp("allapps", "All apps", R.string.app_all_apps, Icons.Filled.List, CarScreen.App("allapps")) { it.open("allapps") }
 
+    /** Whatever the phone is playing, from any app - see [CarServices.openNowPlaying]. */
+    val NowPlaying = BuiltInApp("nowplaying", "Now playing", R.string.app_now_playing, Icons.Filled.PlayArrow, screen = null) {
+        CarServices.openNowPlaying()
+        it.media()
+    }
+
     /** Hands the screen back to the car's own interface, like Android Auto's Exit. */
     val Exit = BuiltInApp("exit", "Exit", R.string.app_exit, CarGlyph, screen = null) { CarFocus.exitToCar() }
 
-    val all = listOf(Web, ScreenSharing, Phone, VehicleData, Settings, Exit, AllApps)
+    val all = listOf(Web, ScreenSharing, Phone, VehicleData, Settings, Exit, AllApps, NowPlaying)
     private val byApp = all.associateWith { Entry(it.label, icon = null, builtIn = it) }
     val everyEntry: List<Entry> = byApp.values.toList()
 

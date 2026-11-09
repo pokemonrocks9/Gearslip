@@ -274,7 +274,7 @@ class CarMedia(private val context: Context) {
         _browse.value = BrowseState()
         // Known to refuse its library (Spotify): asking only costs the seconds it takes to say no,
         // so go straight to its playback session.
-        if (KnownApps.playerWorks(app.component.packageName)) {
+        if (app.sessionOnly || KnownApps.playerWorks(app.component.packageName)) {
             attachToSession(app)
             return
         }
@@ -331,7 +331,7 @@ class CarMedia(private val context: Context) {
             // A known session-only app that isn't running won't start by waiting: say so at once.
             val limit = when {
                 launched -> SESSION_RETRIES_LAUNCHED
-                KnownApps.playerWorks(app.component.packageName) -> 0
+                app.sessionOnly || KnownApps.playerWorks(app.component.packageName) -> 0
                 else -> SESSION_RETRIES
             }
             // The app only publishes its session once its service has started; give it a moment.
@@ -341,7 +341,7 @@ class CarMedia(private val context: Context) {
                 GearslipLog.w("media: ${app.label} has no active session to control")
                 // A session-only app (Spotify) just isn't running - say so and offer to open it,
                 // rather than calling it unsupported.
-                _rejection.value = if (KnownApps.playerWorks(app.component.packageName)) {
+                _rejection.value = if (app.sessionOnly || KnownApps.playerWorks(app.component.packageName)) {
                     Rejection.NEEDS_APP_RUNNING
                 } else {
                     Rejection.REFUSED

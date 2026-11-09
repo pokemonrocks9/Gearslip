@@ -15,6 +15,11 @@ class MediaApp(
     val label: String,
     /** Whose audio to capture: playback capture is scoped to one uid so nothing else leaks in. */
     val uid: Int,
+    /**
+     * No car library at all (YouTube, a podcast app, a browser tab): found only by its playback
+     * session, so the player drives that session and never tries to browse.
+     */
+    val sessionOnly: Boolean = false,
 )
 
 /**
@@ -47,6 +52,29 @@ object MediaCatalog {
             .sortedBy { it.label.lowercase() }
             .toList()
     }
+
+    /**
+     * The player for one package, as the launcher would list it if it has a car library, or
+     * session-only if it doesn't - so anything with a media session can be driven from the car.
+     */
+    fun forPackage(context: Context, packageName: String): MediaApp? {
+        if (packageName == context.packageName || KnownApps.isHidden(packageName)) return null
+        val manager = context.packageManager
+        val app = runCatching { manager.getApplicationInfo(packageName, 0) }.getOrNull() ?: return null
+        val label = app.loadLabel(manager).toString()
+        if (AndroidAuto.matches(packageName, label)) return null
+        val car = manager.queryIntentServices(
+            Intent(MediaBrowserService.SERVICE_INTERFACE).setPackage(packageName), PackageManager.GET_META_DATA,
+        ).firstOrNull { declaresMedia(manager, it.serviceInfo) }?.serviceInfo
+        return if (car != null) {
+            MediaApp(ComponentName(car.packageName, car.name), label, app.uid)
+        } else {
+            MediaApp(ComponentName(packageName, SESSION_ONLY_CLASS), label, app.uid, sessionOnly = true)
+        }
+    }
+
+    /** Placeholder class for a session-only player's component: nothing ever binds to it. */
+    private const val SESSION_ONLY_CLASS = "gearslip.SessionOnly"
 
     /** A descriptor that can't be read keeps the app, rather than dropping a real player over an odd manifest. */
     private fun declaresMedia(manager: PackageManager, service: android.content.pm.ServiceInfo): Boolean {

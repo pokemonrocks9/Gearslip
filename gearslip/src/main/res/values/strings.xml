@@ -881,6 +881,7 @@
     <string name="settings_use_as_launcher_off">For a head unit or a tablet on the dash. Gearslip\'s car screen becomes this device\'s home screen.</string>
     <string name="settings_use_as_launcher_on">Gearslip can be this device\'s home screen. Pick it under Default home app.</string>
     <string name="app_all_apps">All apps</string>
+    <string name="app_now_playing">Now playing</string>
     <string name="launcher_in_car">This device is connected to a car, so Gearslip is on the car\'s screen.</string>
     <string name="launcher_open_gearslip">Open Gearslip</string>
     <string name="status_open_settings">Open settings</string>
