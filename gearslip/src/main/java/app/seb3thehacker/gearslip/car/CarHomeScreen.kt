@@ -278,10 +278,6 @@ private fun DockedPlayer(now: NowPlaying, modifier: Modifier) {
                     )
                 }
             }
-            GsIconButton(
-                Icons.Filled.Close, stringResource(R.string.home_back_nav), navigator::closeSidePanel,
-                Modifier.align(Alignment.TopEnd), size = 36.dp, iconSize = 20.dp,
-            )
         }
     }
 }

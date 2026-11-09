@@ -39,6 +39,7 @@ import app.seb3thehacker.gearslip.host.CarAppConnection
 import app.seb3thehacker.gearslip.host.display
 import app.seb3thehacker.gearslip.host.text
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -553,8 +554,24 @@ private fun NavNowPlaying(navigator: CarNavigator, selected: Boolean, modifier: 
     val phase by media.phase.collectAsState()
     val now by media.now.collectAsState()
     if (phase != CarMedia.Phase.READY || !now.isActive) return
-    // Docked beside the map, the player is already on screen - the pill steps aside for it.
-    if (navigator.sidePanel == SidePanel.CONTROLS && navigator.current == CarScreen.Home) return
+    // Docked beside the map, the player is already on screen - the pill steps aside for it,
+    // leaving only an arrow in its place that sends the player back down into the bar.
+    if (navigator.sidePanel == SidePanel.CONTROLS && navigator.current == CarScreen.Home) {
+        Surface(
+            modifier = modifier.height(44.dp),
+            shape = RoundedCornerShape(14.dp),
+            color = MaterialTheme.colorScheme.secondaryContainer,
+            contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+        ) {
+            Box(Modifier.fillMaxHeight().padding(horizontal = 4.dp), contentAlignment = Alignment.Center) {
+                GsIconButton(
+                    Icons.Filled.KeyboardArrowDown, stringResource(R.string.navbar_close_panel), navigator::closeSidePanel,
+                    size = 36.dp, iconSize = 26.dp,
+                )
+            }
+        }
+        return
+    }
     // The media screen is the full player already; the pill would only repeat its controls.
     if (navigator.current == CarScreen.Media) return
     val context = LocalContext.current
