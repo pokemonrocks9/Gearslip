@@ -39,7 +39,6 @@ import app.seb3thehacker.gearslip.host.CarAppConnection
 import app.seb3thehacker.gearslip.host.display
 import app.seb3thehacker.gearslip.host.text
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -178,9 +177,11 @@ internal fun CarNavBar(navigator: CarNavigator) {
                 // breadcrumb trail is how you retrace your steps, but reaching for either of
                 // these two from three screens deep in a media app shouldn't mean reading it
                 // first.
-                NavHomeButton(navigator, entries, running)
+                // Three buttons with modes rather than one per place: Apps while on Home and Home
+                // everywhere else, the split toggle, then the assistant.
+                NavHomeOrApps(navigator, entries, running)
                 Spacer(Modifier.width(6.dp))
-                NavItem(MediaIcons.Apps, navigator.current == CarScreen.Apps) { navigator.apps() }
+                NavSplitButton(navigator)
                 Spacer(Modifier.width(6.dp))
                 NavAssistantIcon()
 
@@ -271,8 +272,14 @@ internal fun CarNavBar(navigator: CarNavigator) {
  * app's icon and a long press offers to close it, so the app needs no icon of its own on the bar.
  */
 @Composable
-private fun NavHomeButton(navigator: CarNavigator, entries: List<Entry>, running: Map<String, RunningSlot>) {
-    val selected = navigator.current == CarScreen.Home
+private fun NavHomeOrApps(navigator: CarNavigator, entries: List<Entry>, running: Map<String, RunningSlot>) {
+    // Already Home: the button is the way to the apps. Anywhere else it's the way back, to the
+    // map or the split, whichever was up when you left.
+    if (navigator.current == CarScreen.Home) {
+        NavItem(MediaIcons.Apps, selected = false) { navigator.apps() }
+        return
+    }
+    val selected = false
     val navId = running.entries.firstOrNull { it.value == RunningSlot.NAV }?.key
     val navEntry = navId?.let { id -> entries.find { it.componentId == id } }
     GsIconBox(
@@ -292,6 +299,37 @@ private fun NavHomeButton(navigator: CarNavigator, entries: List<Entry>, running
                 modifier = Modifier.padding(NAV_ITEM_PADDING).size(28.dp),
             )
         }
+    }
+}
+
+/**
+ * The split: puts the player beside the map (going Home first if need be) or takes it away. Drawn
+ * on the side the player opens on, filled in and held down while it's open. Off while nothing is
+ * playing, since there'd be nothing to put there.
+ */
+@Composable
+private fun NavSplitButton(navigator: CarNavigator) {
+    val phase by CarServices.media.phase.collectAsState()
+    val now by CarServices.media.now.collectAsState()
+    val playerLeft by CarSettings.playerLeft.collectAsState()
+    val open = navigator.current == CarScreen.Home && navigator.sidePanel != SidePanel.NONE
+    val playing = phase == CarMedia.Phase.READY && now.isActive
+    GsIconBox(
+        { navigator.togglePlayerDock() },
+        colors = navColors(open),
+        enabled = playing || open,
+        latched = open,
+    ) {
+        Icon(
+            when {
+                playerLeft && open -> MediaIcons.DockLeftOpen
+                playerLeft -> MediaIcons.DockLeft
+                open -> MediaIcons.DockRightOpen
+                else -> MediaIcons.DockRight
+            },
+            contentDescription = stringResource(if (open) R.string.navbar_close_panel else R.string.navbar_dock_player),
+            modifier = Modifier.padding(NAV_ITEM_PADDING).size(28.dp),
+        )
     }
 }
 
@@ -554,24 +592,9 @@ private fun NavNowPlaying(navigator: CarNavigator, selected: Boolean, modifier: 
     val phase by media.phase.collectAsState()
     val now by media.now.collectAsState()
     if (phase != CarMedia.Phase.READY || !now.isActive) return
-    // Docked beside the map, the player is already on screen - the pill steps aside for it,
-    // leaving only an arrow in its place that sends the player back down into the bar.
-    if (navigator.sidePanel == SidePanel.CONTROLS && navigator.current == CarScreen.Home) {
-        Surface(
-            modifier = modifier.height(44.dp),
-            shape = RoundedCornerShape(14.dp),
-            color = MaterialTheme.colorScheme.secondaryContainer,
-            contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
-        ) {
-            Box(Modifier.fillMaxHeight().padding(horizontal = 4.dp), contentAlignment = Alignment.Center) {
-                GsIconButton(
-                    Icons.Filled.KeyboardArrowDown, stringResource(R.string.navbar_close_panel), navigator::closeSidePanel,
-                    size = 36.dp, iconSize = 26.dp,
-                )
-            }
-        }
-        return
-    }
+    // Docked beside the map, the player is already on screen - the pill steps aside for it. The
+    // split button by Home/Apps puts it back.
+    if (navigator.sidePanel == SidePanel.CONTROLS && navigator.current == CarScreen.Home) return
     // The media screen is the full player already; the pill would only repeat its controls.
     if (navigator.current == CarScreen.Media) return
     val context = LocalContext.current
@@ -654,20 +677,6 @@ private fun NavNowPlaying(navigator: CarNavigator, selected: Boolean, modifier: 
                         enabled = now.canDo(PlaybackState.ACTION_SKIP_TO_NEXT), size = 36.dp, iconSize = 22.dp,
                     )
                 }
-                // Drawn on the side the panel opens on, and filled in while it's open.
-                val playerLeft by CarSettings.playerLeft.collectAsState()
-                val docked = navigator.current == CarScreen.Home && navigator.sidePanel != SidePanel.NONE
-                GsIconButton(
-                    when {
-                        playerLeft && docked -> MediaIcons.DockLeftOpen
-                        playerLeft -> MediaIcons.DockLeft
-                        docked -> MediaIcons.DockRightOpen
-                        else -> MediaIcons.DockRight
-                    },
-                    stringResource(if (docked) R.string.navbar_close_panel else R.string.navbar_dock_player),
-                    navigator::togglePlayerDock,
-                    size = 36.dp, iconSize = 22.dp,
-                )
             }
             if (now.durationMs > 0) {
                 // matchParentSize, so the line follows the pill's width rather than widening it.
